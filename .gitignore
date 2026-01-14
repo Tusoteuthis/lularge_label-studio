@@ -84,3 +84,9 @@ docker-compose.override.yml
 CLAUDE.local.md
 web/libs/editor/tests/coverage
 .cache
+cookies.txt
+export.zip
+label_export/
+label_exports/
+pdf_export_contents/
+.env
