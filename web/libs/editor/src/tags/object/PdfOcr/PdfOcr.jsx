@@ -9,6 +9,7 @@
  */
 
 import { inject, observer } from 'mobx-react';
+import { isAlive } from 'mobx-state-tree';
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import Registry from '../../../core/Registry';
@@ -820,28 +821,53 @@ const HtxPdfOcr = inject('store')(
       return () => document.removeEventListener('keydown', handleKeyDown);
     }, [handleKeyDown]);
 
-    // Load PDF document
+    // Load PDF document - cache bust v2
     useEffect(() => {
+      console.log('[PdfOcr PDF load v2] Effect triggered, pdfUrl:', item._pdfUrl ? 'exists' : 'null');
       if (!item._pdfUrl) return;
 
+      let cancelled = false; // Cancellation flag for cleanup
+
       const loadDocument = async () => {
+        console.log('[PdfOcr PDF load] Starting load for:', item._pdfUrl);
+
+        // Check if item is still alive before setLoading
+        if (!isAlive(item)) {
+          console.log('[PdfOcr PDF load] Item no longer alive, aborting');
+          return;
+        }
+
         item.setLoading(true);
         try {
           const doc = new PdfDocument(item._pdfUrl);
+          console.log('[PdfOcr PDF load] Created PdfDocument, calling load()');
           await doc.load();
 
+          // Guard: Check if component was unmounted or model detached
+          if (cancelled || !isAlive(item)) {
+            console.log('[PdfOcr PDF load] Cancelled or item dead after load, cleaning up');
+            doc.destroy();
+            return;
+          }
+
+          console.log('[PdfOcr PDF load] PDF loaded, pages:', doc.numPages);
           item.setPdfInfo(doc.numPages, 612, 792); // Default page size
           item.setPdfDocument(doc);
           setPdfDoc(doc);
+          console.log('[PdfOcr PDF load] setPdfDoc called, doc:', doc);
         } catch (error) {
-          console.error('Error loading PDF:', error);
-          item.setError(`Failed to load PDF: ${error.message}`);
+          // Only log error if not cancelled and item still alive
+          if (!cancelled && isAlive(item)) {
+            console.error('Error loading PDF:', error);
+            item.setError(`Failed to load PDF: ${error.message}`);
+          }
         }
       };
 
       loadDocument();
 
       return () => {
+        cancelled = true; // Set cancellation flag on unmount
         if (pdfDoc) {
           pdfDoc.destroy();
         }
@@ -850,20 +876,32 @@ const HtxPdfOcr = inject('store')(
 
     // Load OCR tokens for current page
     useEffect(() => {
-      if (!pdfDoc || !item.tokenoverlay) return;
+      console.log('[PdfOcr useEffect] Token loading effect triggered');
+      console.log('[PdfOcr useEffect] pdfDoc:', pdfDoc ? 'exists' : 'null');
+      console.log('[PdfOcr useEffect] item.tokenoverlay:', item.tokenoverlay);
+      console.log('[PdfOcr useEffect] item._currentPage:', item._currentPage);
+
+      if (!pdfDoc || !item.tokenoverlay) {
+        console.log('[PdfOcr useEffect] Skipping - pdfDoc:', !!pdfDoc, 'tokenoverlay:', item.tokenoverlay);
+        return;
+      }
+
+      let cancelled = false; // Cancellation flag for cleanup
 
       const loadTokens = async () => {
+        console.log('[PdfOcr loadTokens] Starting token load for page:', item._currentPage);
         try {
-          // Check if tokens are already cached in the model
-          const cachedTokens = item.getPageTokens(item._currentPage);
-          if (cachedTokens && cachedTokens.length > 0) {
-            setTokens(cachedTokens);
-            item.setOcrAvailable(true);
+          // Always load fresh tokens from PDF text layer
+          // (Cache disabled to ensure word-level tokenization is applied)
+          const pageTokens = await pdfDoc.getTokens(item._currentPage);
+
+          // Guard against stale callback
+          if (cancelled || !isAlive(item)) {
+            console.log('[PdfOcr loadTokens] Cancelled or item dead, skipping token update');
             return;
           }
 
-          // Try to get tokens from embedded text layer first
-          const pageTokens = await pdfDoc.getTokens(item._currentPage);
+          console.log('[PdfOcr loadTokens] Got', pageTokens?.length || 0, 'tokens');
           setTokens(pageTokens);
           item.setOcrAvailable(pageTokens.length > 0);
 
@@ -872,12 +910,19 @@ const HtxPdfOcr = inject('store')(
             item.setPageTokens(item._currentPage, pageTokens);
           }
         } catch (error) {
-          console.error('Error loading tokens:', error);
-          setTokens([]);
+          // Only log error if not cancelled and item still alive
+          if (!cancelled && isAlive(item)) {
+            console.error('Error loading tokens:', error);
+            setTokens([]);
+          }
         }
       };
 
       loadTokens();
+
+      return () => {
+        cancelled = true; // Set cancellation flag on unmount
+      };
     }, [pdfDoc, item._currentPage, item.tokenoverlay]);
 
     // Handle page dimension updates

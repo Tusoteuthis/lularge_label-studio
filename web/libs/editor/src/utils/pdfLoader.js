@@ -106,41 +106,86 @@ export async function getTextContent(page) {
 }
 
 /**
- * Convert PDF text items to OCR-like token format
+ * Convert PDF text items to OCR-like token format with word-level granularity
  * @param {Object} textContent - PDF.js text content
  * @param {Object} viewport - Page viewport for coordinate conversion
- * @returns {Array} Array of token objects
+ * @returns {Array} Array of token objects (one per word)
  */
 export function textContentToTokens(textContent, viewport) {
   const tokens = [];
   const pageWidth = viewport.width;
   const pageHeight = viewport.height;
+  let tokenIndex = 0;
 
-  textContent.items.forEach((item, index) => {
+  // DEBUG: Log what PDF.js returns
+  console.log('=== PDF.js Text Content Debug ===');
+  console.log('Total items:', textContent.items.length);
+  console.log('First 10 items:', textContent.items.slice(0, 10).map(item => ({
+    str: item.str,
+    width: item.width,
+    height: item.height,
+    hasSpaces: item.str.includes(' '),
+    charCount: item.str.length,
+  })));
+
+  textContent.items.forEach((item) => {
     if (!item.str.trim()) return; // Skip empty items
 
     // Transform matrix [a, b, c, d, e, f] where e,f are x,y positions
     const transform = item.transform;
-    const x = transform[4];
-    const y = transform[5];
-    const width = item.width;
-    const height = item.height;
+    const itemX = transform[4];
+    const itemY = transform[5];
+    const itemWidth = item.width;
+    const itemHeight = item.height;
 
-    // Convert to normalized coordinates (0-1)
-    // Note: PDF origin is bottom-left, canvas is top-left
-    const normalizedX = x / pageWidth;
-    const normalizedY = 1 - (y + height) / pageHeight; // Flip y-axis
-    const normalizedWidth = width / pageWidth;
-    const normalizedHeight = height / pageHeight;
+    // Split text into words for fine-grained selection
+    const text = item.str;
+    const words = text.split(/(\s+)/); // Split but keep spaces for position calculation
 
-    tokens.push({
-      id: `pdf_t${index}`,
-      text: item.str,
-      bbox: [normalizedX, normalizedY, normalizedWidth, normalizedHeight],
-      confidence: 1.0, // PDF text layer is always high confidence
-      // Could add font info here if needed
+    // Calculate character width (approximate - assumes monospace-like distribution)
+    const totalChars = text.length;
+    const charWidth = totalChars > 0 ? itemWidth / totalChars : 0;
+
+    let charOffset = 0;
+
+    words.forEach((word) => {
+      const trimmedWord = word.trim();
+      if (!trimmedWord) {
+        // Skip whitespace but count its width for positioning
+        charOffset += word.length;
+        return;
+      }
+
+      // Calculate word position within the text item
+      const wordX = itemX + (charOffset * charWidth);
+      const wordWidth = word.length * charWidth;
+
+      // Convert to normalized coordinates (0-1)
+      // Note: PDF origin is bottom-left, canvas is top-left
+      const normalizedX = wordX / pageWidth;
+      const normalizedY = 1 - (itemY + itemHeight) / pageHeight; // Flip y-axis
+      const normalizedWidth = wordWidth / pageWidth;
+      const normalizedHeight = itemHeight / pageHeight;
+
+      tokens.push({
+        id: `pdf_t${tokenIndex}`,
+        text: trimmedWord,
+        bbox: [normalizedX, normalizedY, normalizedWidth, normalizedHeight],
+        confidence: 1.0, // PDF text layer is always high confidence
+      });
+
+      tokenIndex++;
+      charOffset += word.length;
     });
   });
+
+  // DEBUG: Log generated tokens
+  console.log('Generated tokens:', tokens.length);
+  console.log('First 10 tokens:', tokens.slice(0, 10).map(t => ({
+    text: t.text,
+    bbox: t.bbox.map(n => n.toFixed(4)),
+  })));
+  console.log('=== End Debug ===');
 
   return tokens;
 }
@@ -219,10 +264,16 @@ export class PdfDocument {
    * @returns {Promise<Array>}
    */
   async getTokens(pageNum, scale = 1.0) {
+    console.log('[PdfDocument.getTokens] Called for page:', pageNum, 'scale:', scale);
     const page = await this.getPage(pageNum);
+    console.log('[PdfDocument.getTokens] Got page:', pageNum);
     const viewport = page.getViewport({ scale });
+    console.log('[PdfDocument.getTokens] Got viewport:', viewport.width, 'x', viewport.height);
     const textContent = await getTextContent(page);
-    return textContentToTokens(textContent, viewport);
+    console.log('[PdfDocument.getTokens] Got textContent, items:', textContent.items.length);
+    const tokens = textContentToTokens(textContent, viewport);
+    console.log('[PdfDocument.getTokens] Generated tokens:', tokens.length);
+    return tokens;
   }
 
   /**
