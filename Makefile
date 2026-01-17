@@ -1,6 +1,6 @@
-# Run Django dev server with Sqlite
+# Run Django dev server with Sqlite (port configurable via DJANGO_PORT, default 8080)
 run-dev:
-	DJANGO_DB=sqlite LOG_DIR=tmp DEBUG=true LOG_LEVEL=DEBUG DJANGO_SETTINGS_MODULE=core.settings.label_studio poetry run python label_studio/manage.py runserver
+	DJANGO_DB=sqlite LOG_DIR=tmp DEBUG=true LOG_LEVEL=DEBUG DJANGO_SETTINGS_MODULE=core.settings.label_studio poetry run python label_studio/manage.py runserver $${DJANGO_PORT:-8080}
 
 # Run Django dev migrations with Sqlite
 migrate-dev:
@@ -16,7 +16,7 @@ shell-dev:
 
 env-dev-setup:
 	if [ ! -f .env ]; then \
-		cp .env.development .env; \
+		cp .env.example .env; \
 	fi
 
 docker-dev-override:

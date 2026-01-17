@@ -1,9 +1,10 @@
- w# Project Guidelines
+# Project Guidelines
 
 ## Documentation
 
 - Before implementing new features, check Context7 MCP for the latest documentation of any libraries/frameworks being used
 - Use `resolve-library-id` first to find the correct library, then `query-docs` to get current docs and examples
+- **Labelling Schema**: See `/labelling_scheme/` for PDF annotation output format documentation (schema-v1.yaml, README.md)
 
 ## Label Studio
 
@@ -24,6 +25,8 @@
 - JavaScript/React (Frontend), Python 3.10+ (Backend - minimal changes) (002-pdf-text-label)
 - N/A (annotations stored via existing Label Studio annotation system) (002-pdf-text-label)
 - Python 3.10+ (backend), TypeScript/React (frontend for export UI) (003-annotation-export)
+- N/A (documentation/schema files only) + YAML format (standard spec) (006-labelling-schema)
+- Git-versioned files in `/labelling_scheme/` directory (006-labelling-schema)
 
 ## Recent Changes
 - 002-pdf-text-label: Added JavaScript/React (Frontend), Python 3.10+ (Backend - minimal changes)

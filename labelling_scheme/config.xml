@@ -1,0 +1,31 @@
+<View>
+  <PdfOcr name="pdf" value="$pdf_url"
+    zoomcontrol="true"
+    rotatecontrol="true"
+    pagenavigation="true"/>
+
+  <!-- Document Classification -->
+  <Choices name="document_type" toName="pdf" choice="single">
+    <Choice value="Invoice"/>
+    <Choice value="Contract"/>
+    <Choice value="Report"/>
+  </Choices>
+
+  <!-- Region Labels (Text, Tables, Images) -->
+  <PdfLabels name="entities" toName="pdf">
+    <!-- Text/Entity Labels -->
+    <Label value="Header" background="#FFA39E"/>
+    <Label value="Date" background="#FFC069"/>
+    <Label value="Amount" background="#AD8B00"/>
+    <Label value="Name" background="#D4380D"/>
+    <Label value="Publishing Date" background="#D3F261"/>
+    <Label value="Reporting Period Start" background="#52C41A"/>
+    <Label value="Reporting Period End" background="#1890FF"/>
+    <!-- Table Labels -->
+    <Label value="Table" background="#722ED1"/>
+    <!-- Image Labels -->
+    <Label value="Chart" background="#13C2C2"/>
+    <Label value="Photo" background="#EB2F96"/>
+    <Label value="Logo" background="#FA8C16"/>
+  </PdfLabels>
+</View>

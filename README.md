@@ -34,30 +34,58 @@ poetry install
 cd web
 yarn install --frozen-lockfile
 cd ..
+
+# Copy environment template (first time only)
+cp .env.example .env
 ```
+
+### Configuration
+
+Port settings are stored in `.env` (copied from `.env.example`). Both the backend and frontend read from this file, ensuring they stay in sync.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DJANGO_PORT` | 8080 | Backend server port |
+| `FRONTEND_PORT` | 8010 | Frontend dev server port |
+| `DJANGO_HOSTNAME` | http://localhost:8080 | Full backend URL (for proxy) |
+| `FRONTEND_HOSTNAME` | http://localhost:8010 | Full frontend URL |
+
+To change ports, edit `.env` — no need to modify multiple files.
 
 ### Running the Application
 
-You need **two terminals** to run both backend and frontend:
+> **Important:** You need **TWO separate terminal windows**. The backend **MUST** be running before you start the frontend.
 
-**Terminal 1 - Backend (Django on port 8000):**
+**Step 1 — Start the Backend (Terminal 1):**
 ```bash
-# Run migrations (first time only)
+# First time only: run migrations
 make migrate-dev
 
 # Start the backend server
 make run-dev
 ```
+✓ **Verify:** You should see `Starting development server at http://127.0.0.1:8080/`
 
-**Terminal 2 - Frontend (Webpack on port 8010):**
+**Step 2 — Start the Frontend (Terminal 2):**
 ```bash
 cd web
-DJANGO_HOSTNAME=http://localhost:8000 yarn dev
+yarn dev
 ```
+✓ **Verify:** You should see `webpack compiled successfully` and the dev server running on port 8010
 
-**Access the application at:** http://localhost:8010
+**Step 3 — Open the Application:**
 
-> **Note:** The frontend dev server runs on port 8010 (not 3000) and proxies API requests to the backend on port 8000.
+Navigate to **http://localhost:8010** in your browser.
+
+> **Note:** The frontend dev server runs on port 8010 and proxies API requests to the backend on port 8080.
+
+### Troubleshooting Startup Issues
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Error occurred while trying to proxy: localhost:8010/` | Backend not running | Start the backend first with `make run-dev` |
+| `Port 8080 already in use` | Another process using port | Run `lsof -i :8080` to find PID, then `kill <PID>` |
+| `Port 8010 already in use` | Another process using port | Run `lsof -i :8010` to find PID, then `kill <PID>` |
 
 ## Custom Features
 
@@ -118,7 +146,7 @@ For detailed development instructions, including all available commands, archite
 
 | Command | Description |
 |---------|-------------|
-| `make run-dev` | Start backend server (port 8000) |
+| `make run-dev` | Start backend server (port 8080) |
 | `make migrate-dev` | Run database migrations |
 | `cd web && yarn dev` | Start frontend dev server (port 8010) |
 | `cd web && yarn lsf:watch` | Watch mode for editor library |

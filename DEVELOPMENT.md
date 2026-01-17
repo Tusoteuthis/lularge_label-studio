@@ -46,19 +46,19 @@ You need **two separate terminals**:
 **Terminal 1 - Backend:**
 ```bash
 make run-dev
-# Runs Django on http://localhost:8000
+# Runs Django on http://localhost:8080
 ```
 
 **Terminal 2 - Frontend:**
 ```bash
 cd web
-DJANGO_HOSTNAME=http://localhost:8000 yarn dev
+yarn dev
 # Runs Webpack dev server on http://localhost:8010
 ```
 
 **Access the application at:** http://localhost:8010
 
-The frontend proxies `/api` requests to the backend automatically.
+The frontend proxies `/api` requests to the backend (port 8080) automatically.
 
 ## Environment Variables
 
@@ -68,7 +68,7 @@ The frontend proxies `/api` requests to the backend automatically.
 |----------|---------|-------------|
 | `FRONTEND_HMR` | `false` | Enable Hot Module Replacement |
 | `FRONTEND_HOSTNAME` | `http://localhost:8010` | Frontend server address |
-| `DJANGO_HOSTNAME` | `http://localhost:8080` | Backend server address |
+| `DJANGO_HOSTNAME` | `http://localhost:8080` | Backend server address (matches `make run-dev`) |
 
 ### Backend (set via environment)
 
@@ -84,7 +84,7 @@ The frontend proxies `/api` requests to the backend automatically.
 
 | Command | Description |
 |---------|-------------|
-| `make run-dev` | Start Django dev server with SQLite |
+| `make run-dev` | Start Django dev server with SQLite (port 8080) |
 | `make migrate-dev` | Run database migrations |
 | `make makemigrations-dev` | Create new migrations |
 | `make shell-dev` | Open Django shell |
@@ -306,11 +306,11 @@ make migrate-dev
 Ensure both servers are running and check the environment:
 ```bash
 # Terminal 1
-make run-dev  # Must show "Starting development server at http://127.0.0.1:8000/"
+make run-dev  # Must show "Starting development server at http://127.0.0.1:8080/"
 
 # Terminal 2
 cd web
-DJANGO_HOSTNAME=http://localhost:8000 yarn dev
+yarn dev
 ```
 
 ### Useful Debug Commands

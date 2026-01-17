@@ -1,0 +1,768 @@
+# PDF Document Labelling Schema
+# Version: 1.1.0
+# Date: 2026-01-16
+# Description: Comprehensive schema for PDF document annotation types
+#
+# This schema documents all annotation output formats for the Label Studio
+# PDF annotation system, including document classification, text selection,
+# table regions, and image regions. Also includes XML configuration templates.
+
+schema:
+  version: "1.1.0"
+  name: "PDF Document Labelling Schema"
+  description: "Annotation output format and XML configuration templates for PDF document labelling"
+  created: "2026-01-16"
+  updated: "2026-01-16"
+  changelog:
+    - version: "1.1.0"
+      date: "2026-01-16"
+      changes: "Added XML configuration templates section"
+    - version: "1.0.0"
+      date: "2026-01-16"
+      changes: "Initial release with all label types"
+
+# =============================================================================
+# COORDINATE SYSTEM
+# =============================================================================
+# All spatial coordinates use percentage-based values (0-100) representing
+# normalized positions relative to page dimensions. This ensures annotations
+# are page-size independent and scale correctly across different renderings.
+#
+# - x: Horizontal position from left edge (0 = left, 100 = right)
+# - y: Vertical position from top edge (0 = top, 100 = bottom)
+# - width: Horizontal span as percentage of page width
+# - height: Vertical span as percentage of page height
+#
+# Example: A region at x=10, y=20, width=30, height=15 occupies
+# 10-40% horizontally and 20-35% vertically of the page.
+
+coordinate_system:
+  type: "percentage"
+  range: [0, 100]
+  origin: "top-left"
+  notes:
+    - "All coordinates are percentages of page dimensions"
+    - "Origin (0,0) is at top-left corner"
+    - "Values must be between 0 and 100 inclusive"
+
+# =============================================================================
+# PAGE NUMBERING
+# =============================================================================
+# Page numbers are 1-based, matching user-facing page display.
+# Page 1 is the first page of the document.
+
+page_numbering:
+  base: 1
+  description: "1-based page numbering (first page = 1)"
+
+# =============================================================================
+# COMMON STRUCTURES
+# =============================================================================
+
+# AnnotationResult: Base wrapper for all annotation types
+# Every annotation result follows this structure with type-specific value objects
+annotation_result:
+  description: "Base structure for all annotation results"
+  fields:
+    id:
+      type: "string"
+      required: true
+      description: "Unique identifier for this result"
+    from_name:
+      type: "string"
+      required: true
+      description: "Name of the control tag that created this result"
+    to_name:
+      type: "string"
+      required: true
+      description: "Name of the object tag being annotated"
+    type:
+      type: "enum"
+      required: true
+      values: ["choices", "pdfregion", "pdftexthighlight"]
+      description: "Annotation type discriminator"
+    value:
+      type: "object"
+      required: true
+      description: "Type-specific value object (see label type definitions)"
+    meta:
+      type: "object"
+      required: false
+      description: "Additional metadata"
+    score:
+      type: "number"
+      required: false
+      range: [0, 1]
+      description: "Confidence score"
+    readonly:
+      type: "boolean"
+      required: false
+      description: "If true, result cannot be edited"
+    origin:
+      type: "string"
+      required: false
+      description: "Source of the annotation (manual, prediction, etc.)"
+    parentID:
+      type: "string"
+      required: false
+      description: "ID of parent result for nested annotations"
+
+# Position: Detailed position reference for text selections
+position:
+  description: "Detailed position reference for text within document"
+  fields:
+    page:
+      type: "integer"
+      required: true
+      minimum: 1
+      description: "Page number (1-based)"
+    line:
+      type: "integer"
+      required: false
+      minimum: 1
+      description: "Line number within page (1-based)"
+    lineEnd:
+      type: "integer"
+      required: false
+      minimum: 1
+      description: "End line number for multi-line selections"
+    paragraph:
+      type: "integer"
+      required: false
+      description: "Paragraph index"
+    startOffset:
+      type: "integer"
+      required: false
+      minimum: 0
+      description: "Character offset from line start"
+    endOffset:
+      type: "integer"
+      required: false
+      minimum: 0
+      description: "End character offset"
+    tokenStart:
+      type: "integer"
+      required: false
+      minimum: 0
+      description: "Start token index in page token array"
+    tokenEnd:
+      type: "integer"
+      required: false
+      minimum: 0
+      description: "End token index in page token array"
+
+# =============================================================================
+# LABEL TYPES OVERVIEW
+# =============================================================================
+# This schema defines four primary label types for PDF annotation:
+#
+# 1. DocumentLabel (type="choices")
+#    - Whole-document classification
+#    - Example: Classifying a document as "Invoice", "Contract", "Report"
+#
+# 2. TextLabel (type="pdftexthighlight")
+#    - Word, phrase, or multi-line text selection
+#    - Example: Highlighting "Invoice #12345" and labeling it as "InvoiceNumber"
+#
+# 3. TableLabel (type="pdfregion" with isTable=true)
+#    - Table region with optional row/column structure
+#    - Example: Drawing a box around a data table and defining its grid
+#
+# 4. ImageLabel (type="pdfregion" without isTable)
+#    - Image or visual element region
+#    - Example: Marking a chart as "BarChart" or a photo as "ProductImage"
+
+label_types:
+  - name: "DocumentLabel"
+    result_type: "choices"
+    description: "Whole-document classification"
+  - name: "TextLabel"
+    result_type: "pdftexthighlight"
+    description: "Word/phrase/paragraph text selection"
+  - name: "TableLabel"
+    result_type: "pdfregion"
+    discriminator: "isTable=true"
+    description: "Table region with structure"
+  - name: "ImageLabel"
+    result_type: "pdfregion"
+    discriminator: "isTable absent or false"
+    description: "Image/visual element region"
+
+# =============================================================================
+# DOCUMENT LABEL (type="choices")
+# =============================================================================
+# Represents a classification applied to the entire document.
+# Used for document-level categorization tasks.
+
+document_label:
+  result_type: "choices"
+  description: "Whole-document classification label"
+  value_schema:
+    choices:
+      type: "array"
+      items: "string"
+      required: true
+      min_items: 1
+      description: "Array of selected classification values"
+  validation_rules:
+    - "choices array must contain at least one element"
+    - "Each choice value must match a defined label in the labeling configuration"
+  example:
+    id: "result_doc_001"
+    from_name: "document_type"
+    to_name: "pdf"
+    type: "choices"
+    value:
+      choices: ["Invoice", "Financial"]
+
+# =============================================================================
+# TEXT LABEL (type="pdftexthighlight")
+# =============================================================================
+# Represents labelled text within a document.
+# Supports word-level, phrase-level, and multi-line selections.
+# Uses token indices for precise text reconstruction.
+
+text_label:
+  result_type: "pdftexthighlight"
+  description: "Text selection label (word, phrase, or multi-line)"
+  value_schema:
+    text:
+      type: "string"
+      required: true
+      description: "The selected text content"
+    page:
+      type: "integer"
+      required: true
+      minimum: 1
+      description: "Page number (1-based)"
+    tokenStart:
+      type: "integer"
+      required: true
+      minimum: 0
+      description: "Start token index in page token array"
+    tokenEnd:
+      type: "integer"
+      required: true
+      minimum: 0
+      description: "End token index in page token array"
+    x:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Bounding box X position (percentage)"
+    y:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Bounding box Y position (percentage)"
+    width:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Bounding box width (percentage)"
+    height:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Bounding box height (percentage)"
+    position:
+      type: "Position"
+      required: false
+      description: "Detailed position reference (see Position schema)"
+  validation_rules:
+    - "page must be >= 1"
+    - "tokenStart must be >= 0"
+    - "tokenEnd must be >= tokenStart"
+    - "All coordinate values (x, y, width, height) must be 0-100"
+  token_selection_notes:
+    - "tokenStart and tokenEnd refer to indices in the page's token array"
+    - "Tokens are extracted from PDF text layer using PDF.js"
+    - "Token indices enable precise text reconstruction even with complex layouts"
+    - "For multi-line selections, the bounding box encompasses all selected tokens"
+  example_single_word:
+    id: "result_text_001"
+    from_name: "ner_labels"
+    to_name: "pdf"
+    type: "pdftexthighlight"
+    value:
+      text: "Invoice"
+      page: 1
+      tokenStart: 5
+      tokenEnd: 5
+      x: 10.5
+      y: 15.2
+      width: 12.0
+      height: 2.5
+  example_multi_word:
+    id: "result_text_002"
+    from_name: "ner_labels"
+    to_name: "pdf"
+    type: "pdftexthighlight"
+    value:
+      text: "Invoice #12345"
+      page: 1
+      tokenStart: 5
+      tokenEnd: 7
+      x: 10.5
+      y: 15.2
+      width: 25.0
+      height: 2.5
+      position:
+        page: 1
+        line: 3
+        tokenStart: 5
+        tokenEnd: 7
+
+# =============================================================================
+# TABLE LABEL (type="pdfregion" with isTable=true)
+# =============================================================================
+# Represents a labelled table region with optional row/column structure.
+# Supports gridline definitions and cell text extraction.
+
+table_label:
+  result_type: "pdfregion"
+  discriminator: "isTable: true"
+  description: "Table region with optional grid structure"
+  value_schema:
+    isTable:
+      type: "boolean"
+      required: true
+      value: true
+      description: "Must be true for table labels"
+    x:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region X position (percentage)"
+    y:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region Y position (percentage)"
+    width:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region width (percentage)"
+    height:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region height (percentage)"
+    page:
+      type: "integer"
+      required: true
+      minimum: 1
+      description: "Page number (1-based)"
+    rotation:
+      type: "number"
+      required: false
+      default: 0
+      description: "Rotation in degrees"
+    row_lines:
+      type: "array"
+      items: "number"
+      required: false
+      description: "Row gridline positions as percentages (0-100) within the region"
+    col_lines:
+      type: "array"
+      items: "number"
+      required: false
+      description: "Column gridline positions as percentages (0-100) within the region"
+    cellTexts:
+      type: "object"
+      required: false
+      description: "Map of 'row-col' keys to cell text content"
+    cells:
+      type: "array"
+      items: "Cell"
+      required: false
+      description: "Structured cell data array"
+    extractedText:
+      type: "string"
+      required: false
+      description: "OCR-extracted text from the table region"
+  gridline_notes:
+    - "row_lines and col_lines are percentages relative to the region bounds"
+    - "Values should be sorted in ascending order"
+    - "0 represents the top/left edge of the region"
+    - "100 represents the bottom/right edge of the region"
+    - "Example: row_lines [0, 33.3, 66.6, 100] creates 3 rows"
+  cell_mapping_notes:
+    - "cellTexts uses 'row-col' format keys (0-indexed)"
+    - "Example: '0-0' = first row, first column"
+    - "Example: '1-2' = second row, third column"
+  cell_schema:
+    description: "Individual cell structure (used in cells array)"
+    fields:
+      row:
+        type: "integer"
+        required: true
+        minimum: 0
+        description: "Row index (0-based)"
+      col:
+        type: "integer"
+        required: true
+        minimum: 0
+        description: "Column index (0-based)"
+      text:
+        type: "string"
+        required: true
+        description: "Cell text content"
+      x:
+        type: "number"
+        required: true
+        range: [0, 100]
+        description: "Cell X position (percentage)"
+      y:
+        type: "number"
+        required: true
+        range: [0, 100]
+        description: "Cell Y position (percentage)"
+      width:
+        type: "number"
+        required: true
+        range: [0, 100]
+        description: "Cell width (percentage)"
+      height:
+        type: "number"
+        required: true
+        range: [0, 100]
+        description: "Cell height (percentage)"
+  validation_rules:
+    - "isTable must be true"
+    - "page must be >= 1"
+    - "All coordinate values must be 0-100"
+    - "row_lines and col_lines must be sorted ascending"
+    - "Cell row/col indices must be within grid bounds"
+  example:
+    id: "result_table_001"
+    from_name: "table_labels"
+    to_name: "pdf"
+    type: "pdfregion"
+    value:
+      isTable: true
+      x: 5.0
+      y: 30.0
+      width: 90.0
+      height: 40.0
+      page: 2
+      rotation: 0
+      row_lines: [0, 33.3, 66.6, 100]
+      col_lines: [0, 50, 100]
+      cellTexts:
+        "0-0": "Header 1"
+        "0-1": "Header 2"
+        "1-0": "Value A"
+        "1-1": "Value B"
+        "2-0": "Value C"
+        "2-1": "Value D"
+
+# =============================================================================
+# IMAGE LABEL (type="pdfregion" without isTable)
+# =============================================================================
+# Represents a labelled image or visual element region.
+# Used for marking charts, photographs, diagrams, logos, etc.
+
+image_label:
+  result_type: "pdfregion"
+  discriminator: "isTable absent or false"
+  description: "Image or visual element region"
+  value_schema:
+    x:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region X position (percentage)"
+    y:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region Y position (percentage)"
+    width:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region width (percentage)"
+    height:
+      type: "number"
+      required: true
+      range: [0, 100]
+      description: "Region height (percentage)"
+    page:
+      type: "integer"
+      required: true
+      minimum: 1
+      description: "Page number (1-based)"
+    rotation:
+      type: "number"
+      required: false
+      default: 0
+      description: "Rotation in degrees"
+    text:
+      type: "string"
+      required: false
+      max_length: 1000
+      description: "Description or classification text for the image"
+  distinguishing_from_table:
+    - "ImageLabel does NOT have isTable field, or isTable is false"
+    - "ImageLabel does NOT have row_lines, col_lines, cellTexts, or cells"
+    - "The label applied (from control tag) typically indicates image type"
+  validation_rules:
+    - "page must be >= 1"
+    - "All coordinate values must be 0-100"
+    - "text field has maximum length of 1000 characters"
+  example:
+    id: "result_image_001"
+    from_name: "image_labels"
+    to_name: "pdf"
+    type: "pdfregion"
+    value:
+      x: 20.0
+      y: 50.0
+      width: 60.0
+      height: 30.0
+      page: 1
+      text: "Quarterly Revenue Chart"
+
+# =============================================================================
+# EDGE CASES
+# =============================================================================
+
+edge_cases:
+  multi_page_selection:
+    description: "Text spanning multiple pages"
+    handling: "Each page portion creates a separate annotation result"
+    note: "Position object can track page range with page and lineEnd fields"
+
+  overlapping_regions:
+    description: "Multiple regions covering the same area"
+    handling: "Each region is independent; overlaps are permitted"
+    note: "Common when different label types apply to same content"
+
+  empty_regions:
+    description: "Region with no extractable text"
+    handling: "Region is valid; text/extractedText fields are empty or absent"
+    note: "Useful for images or visual elements without text"
+
+  rotated_pages:
+    description: "Annotations on rotated PDF pages"
+    handling: "Coordinates are relative to rendered (post-rotation) page"
+    note: "rotation field in region value tracks additional rotation"
+
+  multiple_labels_same_area:
+    description: "Same content area with multiple label types"
+    handling: "Each label creates a separate annotation result"
+    note: "Example: Text selected AND marked as part of a table"
+
+# =============================================================================
+# XML CONFIGURATION TEMPLATES
+# =============================================================================
+# Label Studio uses XML-based configuration to define labelling interfaces.
+# These templates define the INPUT configuration that produces the JSON OUTPUT
+# formats documented above.
+
+xml_configuration:
+  description: "Label Studio XML configuration templates for PDF annotation"
+
+  # Core tag definitions
+  tags:
+    PdfOcr:
+      description: "Renders PDF document and enables annotation"
+      attributes:
+        name:
+          type: "string"
+          required: true
+          description: "Reference name for other tags"
+        value:
+          type: "string"
+          required: true
+          description: "Data field containing PDF URL (e.g., $pdf_url)"
+        zoomcontrol:
+          type: "boolean"
+          required: false
+          default: false
+          description: "Show zoom controls"
+        rotatecontrol:
+          type: "boolean"
+          required: false
+          default: false
+          description: "Show rotation controls"
+        pagenavigation:
+          type: "boolean"
+          required: false
+          default: false
+          description: "Show page navigation"
+      example: |
+        <PdfOcr name="pdf" value="$pdf_url"
+          zoomcontrol="true"
+          rotatecontrol="true"
+          pagenavigation="true"/>
+
+    PdfLabels:
+      description: "Enables text selection and region drawing on PDF"
+      attributes:
+        name:
+          type: "string"
+          required: true
+          description: "Control name (appears in from_name of output)"
+        toName:
+          type: "string"
+          required: true
+          description: "Reference to PdfOcr tag name"
+      children:
+        - "Label"
+      produces:
+        - "pdftexthighlight (for text selections)"
+        - "pdfregion (for region drawings)"
+      example: |
+        <PdfLabels name="entities" toName="pdf">
+          <Label value="Date" background="#FFA39E"/>
+          <Label value="Amount" background="#D4380D"/>
+        </PdfLabels>
+
+    Choices:
+      description: "Enables document-level classification"
+      attributes:
+        name:
+          type: "string"
+          required: true
+          description: "Control name (appears in from_name of output)"
+        toName:
+          type: "string"
+          required: true
+          description: "Reference to PdfOcr tag name"
+        choice:
+          type: "enum"
+          values: ["single", "multiple"]
+          required: false
+          default: "single"
+          description: "Selection mode"
+      children:
+        - "Choice"
+      produces:
+        - "choices"
+      example: |
+        <Choices name="document_type" toName="pdf" choice="single">
+          <Choice value="Invoice"/>
+          <Choice value="Contract"/>
+        </Choices>
+
+    Label:
+      description: "Defines a label option within PdfLabels"
+      attributes:
+        value:
+          type: "string"
+          required: true
+          description: "Label text (appears in annotation output)"
+        background:
+          type: "string"
+          required: false
+          format: "hex color"
+          description: "Highlight color for this label"
+      example: |
+        <Label value="Header" background="#FFA39E"/>
+
+    Choice:
+      description: "Defines a choice option within Choices"
+      attributes:
+        value:
+          type: "string"
+          required: true
+          description: "Choice text (appears in choices array of output)"
+      example: |
+        <Choice value="Invoice"/>
+
+  # Configuration templates by use case
+  templates:
+    document_classification:
+      description: "Whole-document classification"
+      produces: "choices output"
+      xml: |
+        <View>
+          <PdfOcr name="pdf" value="$pdf_url"/>
+          <Choices name="document_type" toName="pdf" choice="single">
+            <Choice value="Invoice"/>
+            <Choice value="Contract"/>
+            <Choice value="Report"/>
+          </Choices>
+        </View>
+
+    text_labelling:
+      description: "Text/entity labelling (NER)"
+      produces: "pdftexthighlight output"
+      xml: |
+        <View>
+          <PdfOcr name="pdf" value="$pdf_url"
+            zoomcontrol="true"
+            rotatecontrol="true"
+            pagenavigation="true"/>
+          <PdfLabels name="entities" toName="pdf">
+            <Label value="Date" background="#FFA39E"/>
+            <Label value="Amount" background="#D4380D"/>
+            <Label value="Name" background="#FFC069"/>
+          </PdfLabels>
+        </View>
+
+    table_labelling:
+      description: "Table region labelling"
+      produces: "pdfregion output with isTable=true"
+      xml: |
+        <View>
+          <PdfOcr name="pdf" value="$pdf_url"
+            zoomcontrol="true"
+            rotatecontrol="true"
+            pagenavigation="true"/>
+          <PdfLabels name="tables" toName="pdf">
+            <Label value="Table" background="#D4380D"/>
+          </PdfLabels>
+        </View>
+
+    image_labelling:
+      description: "Image/visual region labelling"
+      produces: "pdfregion output"
+      xml: |
+        <View>
+          <PdfOcr name="pdf" value="$pdf_url"/>
+          <PdfLabels name="images" toName="pdf">
+            <Label value="Chart" background="#52C41A"/>
+            <Label value="Photo" background="#1890FF"/>
+            <Label value="Logo" background="#722ED1"/>
+          </PdfLabels>
+        </View>
+
+    complete:
+      description: "All label types combined"
+      produces: "choices, pdftexthighlight, and pdfregion outputs"
+      xml: |
+        <View>
+          <PdfOcr name="pdf" value="$pdf_url"
+            zoomcontrol="true"
+            rotatecontrol="true"
+            pagenavigation="true"/>
+
+          <!-- Document Classification -->
+          <Choices name="document_type" toName="pdf" choice="single">
+            <Choice value="Invoice"/>
+            <Choice value="Contract"/>
+            <Choice value="Report"/>
+          </Choices>
+
+          <!-- Text/Entity Labels -->
+          <PdfLabels name="entities" toName="pdf">
+            <Label value="Header" background="#FFA39E"/>
+            <Label value="Date" background="#FFC069"/>
+            <Label value="Amount" background="#AD8B00"/>
+          </PdfLabels>
+
+          <!-- Table Labels -->
+          <PdfLabels name="tables" toName="pdf">
+            <Label value="Table" background="#D4380D"/>
+          </PdfLabels>
+
+          <!-- Image Labels -->
+          <PdfLabels name="images" toName="pdf">
+            <Label value="Chart" background="#52C41A"/>
+            <Label value="Logo" background="#722ED1"/>
+          </PdfLabels>
+        </View>

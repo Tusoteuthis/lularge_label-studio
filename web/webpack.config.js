@@ -21,9 +21,10 @@ const mode = process.env.BUILD_MODULE ? "production" : process.env.NODE_ENV || "
 const isDevelopment = mode !== "production";
 const devtool = process.env.NODE_ENV === "production" ? "source-map" : "cheap-module-source-map";
 const FRONTEND_HMR = process.env.FRONTEND_HMR === "true";
-const FRONTEND_HOSTNAME = FRONTEND_HMR ? process.env.FRONTEND_HOSTNAME || "http://localhost:8010" : "";
+const FRONTEND_PORT = process.env.FRONTEND_PORT || 8010;
+const FRONTEND_HOSTNAME = FRONTEND_HMR ? process.env.FRONTEND_HOSTNAME || `http://localhost:${FRONTEND_PORT}` : "";
 const DJANGO_HOSTNAME = process.env.DJANGO_HOSTNAME || "http://localhost:8080";
-const HMR_PORT = FRONTEND_HMR ? +new URL(FRONTEND_HOSTNAME).port : 8010;
+const HMR_PORT = FRONTEND_HMR ? +new URL(FRONTEND_HOSTNAME).port : FRONTEND_PORT;
 
 const LOCAL_ENV = {
   NODE_ENV: mode,
